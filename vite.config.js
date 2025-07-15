@@ -8,7 +8,7 @@ export default defineConfig({
   base: isProduction ? '/react-vite-deploy-1/' : '/',  // ✅ Correct base path for GitHub Pages
   plugins: [
     react({
-      jsxRuntime: 'classic'
+      jsxRuntime: 'automatic',
     }),
     visualizer({
       open: false,

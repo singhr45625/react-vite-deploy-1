@@ -18,11 +18,14 @@ function App() {
     return children;
   };
 
-  // Loading component (shown during lazy loading)
   const Loading = () => <div className="loading">Loading...</div>;
 
+  // 🔁 Dynamic basename matching Vite config
+  const basename =
+    import.meta.env.MODE === "production" ? "/react-vite-deploy-1" : "/";
+
   return (
-    <BrowserRouter basename="/chat_app">
+    <BrowserRouter basename={basename}>
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/">
@@ -36,7 +39,6 @@ function App() {
             />
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
-            {/* Add catch-all route for GitHub Pages */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
