@@ -5,7 +5,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 const isProduction = process.env.NODE_ENV === 'production';
 
 export default defineConfig({
-  base: isProduction ? '/react-vite-deploy-1/' : '/',  // ✅ Correct base path for GitHub Pages
+  base: '/',  // ✅ Correct base path for GitHub Pages
   plugins: [
     react({
       jsxRuntime: 'automatic',

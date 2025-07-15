@@ -21,8 +21,7 @@ function App() {
   const Loading = () => <div className="loading">Loading...</div>;
 
   // 🔁 Dynamic basename matching Vite config
-  const basename =
-    import.meta.env.MODE === "production" ? "/react-vite-deploy-1" : "/";
+  const basename = import.meta.env.MODE === 'production' ? '/' : '/';
 
   return (
     <BrowserRouter basename={basename}>
