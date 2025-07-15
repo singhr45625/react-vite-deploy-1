@@ -1,0 +1,37 @@
+{
+  "name": "chat_app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "homepage": "https://singhr45625.github.io/chat_app",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --base=/chat_app/",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist -b gh-pages -r https://github.com/singhr45625/chat_app.git"
+  },
+  "dependencies": {
+    "firebase": "^11.10.0",
+    "peerjs": "^1.5.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "sass": "^1.89.2",
+    "simple-peer": "^9.11.1",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "eslint": "^9.30.1",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "gh-pages": "^6.3.0",
+    "globals": "^16.3.0",
+    "rollup-plugin-visualizer": "^6.0.3",
+    "vite": "^7.0.4"
+  }
+}
