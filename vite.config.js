@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig({
-  base: "/chat_app/", // Keep this if deploying to /chat_app subpath
+  base: process.env.VITE_BASE_PATH || "/react-vite-deploy-1",// Keep this if deploying to /chat_app subpath
   plugins: [
     react(),
     visualizer({
