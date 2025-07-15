@@ -3,29 +3,52 @@ import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig({
-  base: process.env.VITE_BASE_PATH || "/react-vite-deploy-1",// Keep this if deploying to /chat_app subpath
+  base: process.env.NODE_ENV === 'production' ? '/chat_app/' : '/',
   plugins: [
-    react(),
+    react({
+      jsxRuntime: 'classic' // Helps with React 18+ compatibility
+    }),
     visualizer({
-      open: true,
-      filename: "stats.html"
+      open: false, // Disable auto-open in production
+      filename: "bundle-stats.html",
+      gzipSize: true
     })
   ],
+  optimizeDeps: {
+    include: [
+      'react-router-dom',
+      'react',
+      'react-dom',
+      'firebase/app',
+      'firebase/auth',
+      'firebase/firestore'
+    ]
+  },
   build: {
-    outDir: 'dist', // Build INSIDE project directory
+    outDir: 'dist',
     emptyOutDir: true,
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1600, // Increased from 1000
     rollupOptions: {
+      external: [], // Ensure no unexpected externalization
       output: {
-        manualChunks: {
-          react: ['react', 'react-dom'],
-          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
-          vendor: ['uuid', 'sass'],
+        manualChunks(id) {
+          // More flexible chunking strategy
+          if (id.includes('node_modules/react')) return 'react-vendor';
+          if (id.includes('node_modules/firebase')) return 'firebase-vendor';
+          if (id.includes('node_modules')) return 'other-vendor';
         },
-        entryFileNames: `assets/[name]-[hash].js`,
-        chunkFileNames: `assets/[name]-[hash].js`,
-        assetFileNames: `assets/[name]-[hash].[ext]`
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js'
       }
     }
+  },
+  server: {
+    port: 3000,
+    strictPort: true
+  },
+  preview: {
+    port: 3000,
+    strictPort: true
   }
 });
