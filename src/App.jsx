@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthContext } from "./context/AuthContext";
 import "./style.scss";
 
-// Lazy-loaded components
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
@@ -20,11 +19,8 @@ function App() {
 
   const Loading = () => <div className="loading">Loading...</div>;
 
-  // 🔁 Dynamic basename matching Vite config
-  const basename = import.meta.env.MODE === 'production' ? '/' : '/';
-
   return (
-    <BrowserRouter basename={basename}>
+    <BrowserRouter> {/* ✅ Removed basename */}
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/">
