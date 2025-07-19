@@ -5,7 +5,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 const isProduction = process.env.NODE_ENV === 'production';
 
 export default defineConfig({
- base: '/',
+ base: '/react-vite-deploy-1/',
   plugins: [
     react({
       jsxRuntime: 'automatic',
