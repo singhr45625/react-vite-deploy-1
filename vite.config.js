@@ -5,7 +5,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 const isProduction = process.env.NODE_ENV === 'production';
 
 export default defineConfig({
-  base: '/',  // ✅ Correct base path for GitHub Pages
+ base: '/',
   plugins: [
     react({
       jsxRuntime: 'automatic',
