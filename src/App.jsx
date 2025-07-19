@@ -20,7 +20,7 @@ function App() {
   const Loading = () => <div className="loading">Loading...</div>;
 
   return (
-    <BrowserRouter> {/* ✅ Removed basename */}
+    <BrowserRouter> 
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/">
