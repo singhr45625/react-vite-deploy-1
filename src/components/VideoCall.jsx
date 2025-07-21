@@ -24,16 +24,19 @@ const VideoCall = ({
   const callDocRef = useRef(null);
   const callIdRef = useRef(initialCallId);
   const queuedCandidates = useRef([]);
-  // Flag to prevent multiple concurrent negotiations
   const isNegotiating = useRef(false); 
   const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
 
-  // ICE server configuration
+  // Enhanced ICE server configuration with TURN
   const iceServers = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
-      { urls: "stun:stun2.l.google.com:19302" },
+      { 
+        urls: "turn:your-turn-server.com:3478",
+        username: "your-username",
+        credential: "your-credential" 
+      }
     ],
     iceCandidatePoolSize: 10,
   };
@@ -112,13 +115,13 @@ const VideoCall = ({
     if (isInitiator && !isNegotiating.current && peerConnection.current.signalingState === 'stable') {
       isNegotiating.current = true;
       console.log("Negotiation needed. Attempting to create offer...");
+      console.log(`Current signaling state: ${peerConnection.current.signalingState}`);
+      
       try {
-        // Create a new offer
         const offer = await peerConnection.current.createOffer();
         await peerConnection.current.setLocalDescription(offer);
         console.log("Negotiation: Local offer set.");
 
-        // Update the Firestore document with the new offer
         await updateDoc(callDocRef.current, {
           offer: {
             type: offer.type,
@@ -134,51 +137,61 @@ const VideoCall = ({
         isNegotiating.current = false;
       }
     } else {
-        console.log("Negotiation needed, but not initiating (not initiator, or already negotiating, or not stable):", 
-                    peerConnection.current.signalingState, isNegotiating.current, isInitiator);
+      console.log("Negotiation needed, but not initiating:", {
+        isInitiator,
+        isNegotiating: isNegotiating.current,
+        signalingState: peerConnection.current.signalingState
+      });
     }
   };
 
-  // Listen for answer from remote peer (CALLER SIDE)
+  // Improved answer handling
   const listenForAnswer = () => {
-    const unsubscribe = onSnapshot(callDocRef.current, async (snapshot) => {
-      const data = snapshot.data();
-      console.log("Caller: onSnapshot triggered for answer. Data:", data);
+  const unsubscribe = onSnapshot(callDocRef.current, async (snapshot) => {
+    const data = snapshot.data();
+    if (data?.answer) {
+      try {
+        const pc = peerConnection.current;
 
-      // Check for an answer and ensure it's not already set
-      // Also ensure we are not in the middle of our own negotiation
-      if (data?.answer && 
-          !peerConnection.current.currentRemoteDescription && 
-          peerConnection.current.signalingState === 'have-local-offer') { // Ensure we are waiting for an answer
-        try {
-          console.log("Caller: Received answer from Firebase:", data.answer);
-          console.log("Caller: Signaling state before setting remote description (answer):", peerConnection.current.signalingState);
-
-          await peerConnection.current.setRemoteDescription(
-            new RTCSessionDescription(data.answer)
-          );
-          console.log("Caller: Remote description (answer) set successfully.");
+        // 🔐 Final condition
+        if (
+          pc &&
+          !pc.remoteDescription &&
+          pc.signalingState === "have-local-offer"
+        ) {
+          console.log("Caller: Setting remote answer...");
+          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          console.log("Caller: Remote answer set.");
           setCallStatus("active");
           await processQueuedCandidates();
-        } catch (err) {
-          console.error("Caller ERROR: Failed to set remote description (answer):", err);
-          setError(`Failed to process answer: ${err.message || err.name}`);
-          setCallStatus("failed");
+        } else {
+          console.warn("Caller: Not setting answer — invalid state or already set", {
+            signalingState: pc?.signalingState,
+            remoteDescription: pc?.remoteDescription,
+          });
         }
+      } catch (err) {
+        console.error("Failed to set remote answer:", err);
+        setError(`Failed to process answer: ${err.message || err.name}`);
+        setCallStatus("failed");
       }
-      if (data?.status === "ended") {
-        console.log("Call status changed to ended by remote peer.");
-        endCall();
-      }
-    });
-    return unsubscribe; // Return the unsubscribe function
-  };
+    }
+
+    if (data?.status === "ended") {
+      console.log("Call status changed to ended by remote peer.");
+      endCall();
+    }
+  });
+
+  return unsubscribe;
+};
+
 
   // Listen for incoming ICE candidates from remote peer
   const listenForCandidates = () => {
     if (!callIdRef.current) {
       console.warn("Cannot listen for candidates: callIdRef.current is null.");
-      return () => {}; // Return a no-op unsubscribe
+      return () => {};
     }
 
     const candidatesRef = collection(
@@ -207,10 +220,10 @@ const VideoCall = ({
         }
       });
     });
-    return unsubscribe; // Return the unsubscribe function
+    return unsubscribe;
   };
 
-  // Create a new call as the initiator (CALLER SIDE)
+  // Create a new call as the initiator
   const createCall = async () => {
     try {
       setCallStatus("creating-call");
@@ -232,9 +245,8 @@ const VideoCall = ({
       }, { merge: true });
       console.log("Call document created/updated in Firebase with ID:", callIdRef.current);
 
-      // Initial offer creation - ensure no other negotiation is active
       if (peerConnection.current.signalingState === 'stable' && !isNegotiating.current) {
-          isNegotiating.current = true; // Set flag
+          isNegotiating.current = true;
           const offer = await peerConnection.current.createOffer();
           await peerConnection.current.setLocalDescription(offer);
           console.log("Caller: Initial Local description (offer) set.");
@@ -248,9 +260,9 @@ const VideoCall = ({
           });
           console.log("Caller: Initial Offer sent to Firebase.");
       } else {
-          console.warn("Caller: Not creating initial offer. Signaling state:", peerConnection.current.signalingState, "Is negotiating:", isNegotiating.current);
-          // This might happen if useEffect re-runs too quickly or permissions take time
-          // It's crucial not to create a *new* offer if one is already in progress.
+          console.warn("Caller: Not creating initial offer. Signaling state:", 
+                      peerConnection.current.signalingState, 
+                      "Is negotiating:", isNegotiating.current);
       }
       
       const unsubscribeAnswer = listenForAnswer();
@@ -263,11 +275,11 @@ const VideoCall = ({
       setCallStatus("failed");
       return [];
     } finally {
-        isNegotiating.current = false; // Reset flag after initial offer attempt
+        isNegotiating.current = false;
     }
   };
 
-  // Answer an incoming call (RECEIVER SIDE)
+  // Answer an incoming call
   const answerCall = async () => {
     try {
       setCallStatus("answering-call");
@@ -293,11 +305,25 @@ const VideoCall = ({
         if (data?.offer && !peerConnection.current.currentRemoteDescription) {
           try {
             console.log("Receiver: Received offer from Firebase:", data.offer);
-            console.log("Receiver: Signaling state before setting remote description (offer):", peerConnection.current.signalingState);
+            console.log("Receiver: Signaling state before setting remote description (offer):", 
+                       peerConnection.current.signalingState);
 
-            await peerConnection.current.setRemoteDescription(
-              new RTCSessionDescription(data.offer)
-            );
+            if (
+  peerConnection.current &&
+  !peerConnection.current.remoteDescription &&
+  peerConnection.current.signalingState === "stable"
+) {
+  await peerConnection.current.setRemoteDescription(
+    new RTCSessionDescription(data.offer)
+  );
+  console.log("Receiver: Remote offer set.");
+} else {
+  console.warn("Receiver: Skipping setRemoteDescription (offer)", {
+    signalingState: peerConnection.current?.signalingState,
+    remoteDescription: peerConnection.current?.remoteDescription,
+  });
+}
+
             console.log("Receiver: Remote description (offer) set successfully.");
 
             const answer = await peerConnection.current.createAnswer();
@@ -376,7 +402,7 @@ const VideoCall = ({
       console.log("RTCPeerConnection closed.");
     }
     queuedCandidates.current = [];
-    isNegotiating.current = false; // Reset negotiation flag on cleanup
+    isNegotiating.current = false;
     setLocalStream(null);
     setRemoteStream(null);
     setCallStatus("idle");
@@ -397,35 +423,47 @@ const VideoCall = ({
         if (stream) {
           peerConnection.current = new RTCPeerConnection(iceServers);
 
-          // Add negotiationneeded listener here, after peerConnection is initialized
+          // Add event listeners
           peerConnection.current.onnegotiationneeded = handleNegotiationNeeded;
+          peerConnection.current.onicecandidate = handleICECandidate;
+          peerConnection.current.ontrack = handleTrack;
+          
+          peerConnection.current.oniceconnectionstatechange = () => {
+            const state = peerConnection.current.iceConnectionState;
+            console.log("ICE connection state changed:", state);
+            
+            if (state === 'failed') {
+              setError("ICE connection failed. Trying to recover...");
+              // Could add reconnection logic here
+            }
+          };
 
+          peerConnection.current.onconnectionstatechange = () => {
+            const state = peerConnection.current.connectionState;
+            console.log("Peer connection state changed:", state);
+            
+            if (state === 'failed') {
+              setError("WebRTC connection failed. Trying to reconnect...");
+              setTimeout(() => {
+                if (peerConnection.current.connectionState === 'failed') {
+                  endCall();
+                }
+              }, 2000);
+            } else if (state === 'disconnected') {
+              setError("WebRTC connection disconnected.");
+            }
+          };
+
+          // Add local tracks
           stream.getTracks().forEach((track) => {
             peerConnection.current.addTrack(track, stream);
           });
 
-          peerConnection.current.onicecandidate = handleICECandidate;
-          peerConnection.current.ontrack = handleTrack;
-          peerConnection.current.oniceconnectionstatechange = () => {
-            console.log("ICE connection state changed:", peerConnection.current.iceConnectionState);
-          };
-          peerConnection.current.onconnectionstatechange = () => {
-            console.log("Peer connection state changed:", peerConnection.current.connectionState);
-            if (peerConnection.current.connectionState === 'failed') {
-                setError("WebRTC connection failed.");
-                setCallStatus("failed");
-            } else if (peerConnection.current.connectionState === 'disconnected') {
-                setError("WebRTC connection disconnected.");
-            }
-          };
-
           setCallStatus("setting-up-call");
 
           if (isInitiator) {
-            // Initiate the call (this will create the initial offer)
             unsubscribeFunctions = await createCall();
           } else {
-            // Answer the call
             unsubscribeFunctions = await answerCall();
           }
         }
@@ -448,9 +486,7 @@ const VideoCall = ({
     return () => {
       console.log("Running useEffect cleanup...");
       unsubscribeFunctions.forEach(unsub => {
-        if (typeof unsub === 'function') {
-          unsub();
-        }
+        if (typeof unsub === 'function') unsub();
       });
       cleanupCall();
     };
@@ -537,14 +573,25 @@ const VideoCall = ({
               {callStatus === "creating-call" && <p>Calling...</p>}
               {callStatus === "answering-call" && <p>Answering...</p>}
               {callStatus === "ending-call" && <p>Ending call...</p>}
-              {callStatus === "failed" && <p className="error">Call failed.</p>}
-              {error && <p className="error">Error: {error}</p>}
+              {callStatus === "failed" && (
+                <p className="error">
+                  Call failed. {error && <span>{error}</span>}
+                </p>
+              )}
             </div>
 
             <div className="call-controls">
               <button onClick={endCall} className="end-call-button">
                 End Call
               </button>
+              {callStatus === "failed" && (
+                <button 
+                  onClick={() => window.location.reload()} 
+                  className="retry-button"
+                >
+                  Retry Call
+                </button>
+              )}
             </div>
           </>
         )}

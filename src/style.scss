@@ -522,3 +522,32 @@
     margin-bottom: 20px;
   }
 }
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chats-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Optional: Custom scrollbar styling */
+.chats-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chats-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.chats-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.chats-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
